@@ -1,14 +1,15 @@
 import json
 from datetime import datetime
 
-from ask import ask_claude, ask_gpt, cached, CLAUDE_MODEL, GPT_MODEL
-
+from ask import ask_claude, ask_gpt, ask_oss, cached, CLAUDE_MODEL, GPT_MODEL, OSS_MODEL
 PRICES = {
     CLAUDE_MODEL: (1.00, 5.00),
     GPT_MODEL: (0.20, 1.25),
+    OSS_MODEL: (0.075, 0.30),
 }
 
 CLASSIFY_SYSTEM = (
+
     "You are a customer-support ticket classifier. Reply with exactly one label: "
     "billing, technical, shipping, account, or other. No other text."
 )
@@ -37,7 +38,7 @@ def run():
     results = []
     for p in PROMPTS:
         print(f"[{p['id']}/{len(PROMPTS)}] {p['category']}: {p['prompt'][:50]}...")
-        for fn, model in ((ask_claude, CLAUDE_MODEL), (ask_gpt, GPT_MODEL)):
+        for fn, model in ((ask_claude, CLAUDE_MODEL), (ask_gpt, GPT_MODEL), (ask_oss, OSS_MODEL)):
             try:
                 r = cached(fn, model, p["prompt"], p.get("system"))
                 r["cost"] = 0 if r["cached"] else cost(model, r["in"], r["out"])

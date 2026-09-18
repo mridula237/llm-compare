@@ -5,14 +5,21 @@ from openai import OpenAI
 import hashlib
 import json
 import sqlite3
+import os
 
 CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 GPT_MODEL = "gpt-5.4-nano"
+OSS_MODEL = "openai/gpt-oss-20b"
+
 MAX_TOKENS = 1024
 
 claude = anthropic.Anthropic()
 gpt = OpenAI()
 
+oss = OpenAI(
+    api_key=os.environ["GROQ_API_KEY"],
+    base_url="https://api.groq.com/openai/v1",
+)
 DB = sqlite3.connect("cache.db")
 DB.execute("CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, response TEXT)")
 
@@ -93,6 +100,39 @@ def ask_gpt(prompt, system=None, stream=False):
     return {"model": GPT_MODEL, "text": text, "in": in_tok, "out": out_tok,
             "latency": latency, "ttft": ttft}
 
+def ask_oss(prompt, system=None, stream=False):
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    kwargs = dict(model=OSS_MODEL, max_tokens=MAX_TOKENS, messages=messages)
+
+    start = time.perf_counter()
+    ttft = None
+    if stream:
+        print(f"\n===== {OSS_MODEL} =====")
+        pieces, usage = [], None
+        for chunk in oss.chat.completions.create(
+            **kwargs, stream=True, stream_options={"include_usage": True}
+        ):
+            if chunk.usage:
+                usage = chunk.usage
+            if chunk.choices and chunk.choices[0].delta.content:
+                if ttft is None:
+                    ttft = time.perf_counter() - start
+                pieces.append(chunk.choices[0].delta.content)
+                print(pieces[-1], end="", flush=True)
+        print()
+        text = "".join(pieces)
+        in_tok = usage.prompt_tokens if usage else 0
+        out_tok = usage.completion_tokens if usage else 0
+    else:
+        r = oss.chat.completions.create(**kwargs)
+        text, in_tok, out_tok = r.choices[0].message.content, r.usage.prompt_tokens, r.usage.completion_tokens
+    latency = time.perf_counter() - start
+
+    return {"model": OSS_MODEL, "text": text, "in": in_tok, "out": out_tok,
+            "latency": latency, "ttft": ttft}
 
 def main():
     parser = argparse.ArgumentParser(description="Ask Claude and GPT the same prompt")
@@ -102,7 +142,8 @@ def main():
     args = parser.parse_args()
 
     results = [cached(ask_claude, CLAUDE_MODEL, args.prompt, args.system, args.stream),
-               cached(ask_gpt, GPT_MODEL, args.prompt, args.system, args.stream)]
+               cached(ask_gpt, GPT_MODEL, args.prompt, args.system, args.stream),
+               cached(ask_oss, OSS_MODEL, args.prompt, args.system, args.stream)]
     if not args.stream and all(r["cached"] for r in results):
         print("(cached, no API calls made, $0)")
 
