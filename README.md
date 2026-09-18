@@ -53,5 +53,6 @@ Prices per 1M tokens: Haiku $1.00 in / $5.00 out; nano $0.20 in / $1.25 out.
 pip install anthropic openai
 export ANTHROPIC_API_KEY=... OPENAI_API_KEY=...
 python ask.py "Your prompt" [--stream] [--system "You are an expert in X"]
+node ask.mjs "Your prompt" [--stream] [--system "You are an expert in X"]   
 python compare.py   # runs all 10 prompts → results.json
 ```
