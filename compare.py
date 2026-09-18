@@ -41,7 +41,7 @@ def run():
         for fn, model in ((ask_claude, CLAUDE_MODEL), (ask_gpt, GPT_MODEL), (ask_oss, OSS_MODEL)):
             try:
                 r = cached(fn, model, p["prompt"], p.get("system"))
-                r["cost"] = 0 if r["cached"] else cost(model, r["in"], r["out"])
+                r["cost"] = cost(model, r["in"], r["out"])
                 r["error"] = None
             except Exception as e: 
                 r = {"model": model, "text": "", "in": 0, "out": 0,
