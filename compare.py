@@ -3,7 +3,7 @@ from datetime import datetime
 
 from ask import ask_claude, ask_gpt, CLAUDE_MODEL, GPT_MODEL
 
-# USD per 1M tokens: (input, output). Verify on official pricing pages.
+
 PRICES = {
     CLAUDE_MODEL: (1.00, 5.00),
     GPT_MODEL: (0.20, 1.25),
@@ -43,7 +43,7 @@ def run():
                 r = fn(p["prompt"], p.get("system"))
                 r["cost"] = cost(model, r["in"], r["out"])
                 r["error"] = None
-            except Exception as e:  # one failure shouldn't kill the whole run
+            except Exception as e: 
                 r = {"model": model, "text": "", "in": 0, "out": 0,
                      "latency": 0, "ttft": None, "cost": 0, "error": str(e)}
             if "expected" in p and not r["error"]:
