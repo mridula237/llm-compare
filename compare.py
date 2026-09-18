@@ -1,8 +1,7 @@
 import json
 from datetime import datetime
 
-from ask import ask_claude, ask_gpt, CLAUDE_MODEL, GPT_MODEL
-
+from ask import ask_claude, ask_gpt, cached, CLAUDE_MODEL, GPT_MODEL
 
 PRICES = {
     CLAUDE_MODEL: (1.00, 5.00),
@@ -40,8 +39,8 @@ def run():
         print(f"[{p['id']}/{len(PROMPTS)}] {p['category']}: {p['prompt'][:50]}...")
         for fn, model in ((ask_claude, CLAUDE_MODEL), (ask_gpt, GPT_MODEL)):
             try:
-                r = fn(p["prompt"], p.get("system"))
-                r["cost"] = cost(model, r["in"], r["out"])
+                r = cached(fn, model, p["prompt"], p.get("system"))
+                r["cost"] = 0 if r["cached"] else cost(model, r["in"], r["out"])
                 r["error"] = None
             except Exception as e: 
                 r = {"model": model, "text": "", "in": 0, "out": 0,

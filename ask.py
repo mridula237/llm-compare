@@ -1,8 +1,10 @@
 import argparse
 import time
-
 import anthropic
 from openai import OpenAI
+import hashlib
+import json
+import sqlite3
 
 CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 GPT_MODEL = "gpt-5.4-nano"
@@ -11,6 +13,25 @@ MAX_TOKENS = 1024
 claude = anthropic.Anthropic()
 gpt = OpenAI()
 
+DB = sqlite3.connect("cache.db")
+DB.execute("CREATE TABLE IF NOT EXISTS cache (key TEXT PRIMARY KEY, response TEXT)")
+
+
+def cached(fn, model, prompt, system=None, stream=False):
+    """Return a saved response if this exact model+system+prompt was asked before."""
+    if stream: 
+        return fn(prompt, system, stream)
+    key = hashlib.sha256(json.dumps([model, system, prompt]).encode()).hexdigest()
+    row = DB.execute("SELECT response FROM cache WHERE key = ?", (key,)).fetchone()
+    if row:
+        r = json.loads(row[0])
+        r["cached"] = True
+        return r
+    r = fn(prompt, system, stream)
+    DB.execute("INSERT OR REPLACE INTO cache VALUES (?, ?)", (key, json.dumps(r)))
+    DB.commit()
+    r["cached"] = False
+    return r
 
 def ask_claude(prompt, system=None, stream=False):
     kwargs = dict(model=CLAUDE_MODEL, max_tokens=MAX_TOKENS,
@@ -80,8 +101,10 @@ def main():
     parser.add_argument("--system", default=None, help='e.g. "You are a helpful expert in X"')
     args = parser.parse_args()
 
-    results = [ask_claude(args.prompt, args.system, args.stream),
-               ask_gpt(args.prompt, args.system, args.stream)]
+    results = [cached(ask_claude, CLAUDE_MODEL, args.prompt, args.system, args.stream),
+               cached(ask_gpt, GPT_MODEL, args.prompt, args.system, args.stream)]
+    if not args.stream and all(r["cached"] for r in results):
+        print("(cached, no API calls made, $0)")
 
     if not args.stream: 
         for r in results:
